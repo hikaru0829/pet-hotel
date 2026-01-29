@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ServiceType {
+  DAYCARE
+  STAY
+  GROOMING
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("OWNER") // OWNER, STAFF, ADMIN
+  accounts      Account[]
+  sessions      Session[]
+  pets          Pet[]
+  reservations  Reservation[]
+}
+
+model Staff {
+  id            String        @id @default(cuid())
+  name          String
+  role          String        // TRIMMER, NURSE, etc.
+  reservations  Reservation[]
+}
+
+model VerificationToken {
+// ... (rest remains same)
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Pet {
+  id                String    @id @default(cuid())
+  name              String
+  type              String    // e.g., "DOG", "CAT"
+  breed             String?
+  age               Int?
+  vaccinesUpToDate  Boolean   @default(false)
+  vaccineExpiration DateTime?
+  ownerId           String
+  owner             User      @relation(fields: [ownerId], references: [id])
+  reservations      Reservation[]
+}
+
+model Service {
+  id          String      @id @default(cuid())
+  name        String
+  type        ServiceType
+  description String?
+  price       Float
+  capacity    Int
+  reservations Reservation[]
+}
+
+model Reservation {
+  id              String            @id @default(cuid())
+  serviceType     ServiceType
+  serviceId       String
+  service         Service           @relation(fields: [serviceId], references: [id])
+  date            DateTime
+  startTime       DateTime?
+  endTime         DateTime?
+  status          ReservationStatus @default(PENDING)
+  petId           String
+  pet             Pet               @relation(fields: [petId], references: [id])
+  ownerId         String
+  owner           User              @relation(fields: [ownerId], references: [id])
+  staffId         String?
+  staff           Staff?            @relation(fields: [staffId], references: [id])
+  groomingOptions String?           // Could be JSON string for simplicity here
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
