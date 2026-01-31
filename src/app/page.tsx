@@ -1,103 +1,85 @@
-import Image from "next/image";
+import Link from 'next/link'
+import { prisma } from '@/lib/prisma'
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+export default async function Home() {
+  try {
+    const services = await prisma.service.findMany()
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Hero Section */}
+        <header className="bg-white shadow-sm">
+          <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8 text-center">
+            <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl sm:tracking-tight lg:text-6xl">
+              ペット保育園・ホテル・トリミング
+            </h1>
+            <p className="mt-5 max-w-xl mx-auto text-xl text-gray-500">
+              大切なペットに、最高のケアと安心を。
+            </p>
+          </div>
+        </header>
+
+        <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+          {/* Service List */}
+          <div className="grid grid-cols-1 gap-y-10 sm:grid-cols-2 gap-x-6 lg:grid-cols-3 xl:gap-x-8">
+            {services.map((service) => (
+              <div key={service.id} className="group relative bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="p-6">
+                  <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mb-2">
+                    {service.type === 'DAYCARE' ? '保育園' : service.type === 'STAY' ? '宿泊' : 'トリミング'}
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {service.name}
+                  </h3>
+                  <p className="text-gray-500 text-sm mb-4 line-clamp-3">
+                    {service.description}
+                  </p>
+                  <div className="flex items-center justify-between mt-auto">
+                    <span className="text-2xl font-bold text-indigo-600">
+                      ¥{service.price.toLocaleString()}
+                    </span>
+                    <Link
+                      href={`/reserve/${service.type.toLowerCase()}/${service.id}`}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      予約する
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Notes Section */}
+          <section className="mt-16 bg-indigo-50 rounded-2xl p-8 shadow-inner">
+            <h2 className="text-2xl font-bold text-indigo-900 mb-4">ご利用にあたって</h2>
+            <ul className="list-disc list-inside space-y-2 text-indigo-800">
+              <li>狂犬病および混合ワクチンの接種証明書を必ずご持参ください。</li>
+              <li>持病やアレルギーがある場合は、事前にお知らせください。</li>
+              <li>キャンセルの場合は、前日までにご連絡をお願いいたします。</li>
+            </ul>
+          </section>
+        </main>
+      </div>
+    )
+  } catch (error) {
+    console.error('Home Page Error:', error)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Internal Server Error</h1>
+          <p className="text-gray-600 mb-4">データの取得中にエラーが発生しました。</p>
+          <pre className="bg-gray-100 p-4 rounded text-sm overflow-auto max-h-40">
+            {error instanceof Error ? error.message : String(error)}
+          </pre>
+          <Link 
+            href="/"
+            className="mt-6 block w-full py-2 bg-indigo-600 text-white rounded text-center hover:bg-indigo-700"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            トップページを再読み込み
+          </Link>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+      </div>
+    )
+  }
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { reservationSchema } from '@/lib/validations/reservation'
+import { ZodError } from 'zod'
+import { sendReservationEmail, sendAdminNotificationEmail } from '@/lib/mail'
 
 export async function POST(req: Request) {
   try {
@@ -8,19 +10,28 @@ export async function POST(req: Request) {
     const validatedData = reservationSchema.parse(body)
 
     // 1. Vaccine Check
-    const pet = await prisma.pet.findUnique({
-      where: { id: validatedData.petId },
-    })
+    if (validatedData.petId) {
+      const pet = await prisma.pet.findUnique({
+        where: { id: validatedData.petId },
+      })
 
-    if (!pet) {
-      return NextResponse.json({ error: 'Pet not found' }, { status: 404 })
-    }
+      if (!pet) {
+        return NextResponse.json({ error: 'Pet not found' }, { status: 404 })
+      }
 
-    if (!validatedData.vaccinesUpToDate || !pet.vaccinesUpToDate) {
-      return NextResponse.json(
-        { error: 'Vaccines must be up to date for reservation' },
-        { status: 400 }
-      )
+      if (!validatedData.vaccinesUpToDate || !pet.vaccinesUpToDate) {
+        return NextResponse.json(
+          { error: 'Vaccines must be up to date for reservation' },
+          { status: 400 }
+        )
+      }
+    } else {
+      if (!validatedData.vaccinesUpToDate) {
+        return NextResponse.json(
+          { error: 'Vaccines must be up to date for reservation' },
+          { status: 400 }
+        )
+      }
     }
 
     // 2. Capacity Check
@@ -48,23 +59,25 @@ export async function POST(req: Request) {
     }
 
     // 3. Duplicate Check
-    const existingReservation = await prisma.reservation.findFirst({
-      where: {
-        petId: validatedData.petId,
-        serviceId: validatedData.serviceId,
-        date: validatedData.date,
-        status: { not: 'CANCELLED' },
-      },
-    })
+    if (validatedData.petId) {
+      const existingReservation = await prisma.reservation.findFirst({
+        where: {
+          petId: validatedData.petId,
+          serviceId: validatedData.serviceId,
+          date: validatedData.date,
+          status: { not: 'CANCELLED' },
+        },
+      })
 
-    if (existingReservation) {
-      return NextResponse.json(
-        { error: 'Pet already has a reservation for this service on this date' },
-        { status: 400 }
-      )
+      if (existingReservation) {
+        return NextResponse.json(
+          { error: 'Pet already has a reservation for this service on this date' },
+          { status: 400 }
+        )
+      }
     }
 
-    // 4. Staff Availability Check (for Grooming)
+    // 4. Staff Availability Check
     if (validatedData.serviceType === 'GROOMING' && validatedData.staffId) {
       const staffReservation = await prisma.reservation.findFirst({
         where: {
@@ -86,21 +99,35 @@ export async function POST(req: Request) {
     const reservation = await prisma.reservation.create({
       data: {
         serviceType: validatedData.serviceType,
-        serviceId: validatedData.serviceId,
+        service: { connect: { id: validatedData.serviceId } },
         date: validatedData.date,
         startTime: validatedData.startTime,
         endTime: validatedData.endTime,
-        petId: validatedData.petId,
-        ownerId: validatedData.ownerId,
-        staffId: validatedData.staffId,
+        pet: validatedData.petId ? { connect: { id: validatedData.petId } } : undefined,
+        owner: { connect: { id: validatedData.ownerId } },
+        staff: validatedData.staffId ? { connect: { id: validatedData.staffId } } : undefined,
         groomingOptions: validatedData.groomingOptions,
+        status: 'CONFIRMED',
+        ownerName: validatedData.ownerName,
+        phone: validatedData.phone,
+        email: validatedData.email,
+        petName: validatedData.petName,
+        pickupOption: validatedData.pickupOption,
+        pickupTime: validatedData.pickupTime,
+        notes: validatedData.notes,
       },
     })
 
+    // 6. Send Email Notifications
+    await Promise.all([
+      sendReservationEmail(reservation),
+      sendAdminNotificationEmail(reservation)
+    ])
+
     return NextResponse.json(reservation, { status: 201 })
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
-      return NextResponse.json({ error: error.errors }, { status: 400 })
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
     }
     console.error('Reservation error:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
