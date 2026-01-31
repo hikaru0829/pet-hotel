@@ -40,7 +40,7 @@ RUN npm ci
 FROM base AS builder
 RUN apt-get update && apt-get install -y openssl
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./
 COPY . .
 
 # Prisma Clientの生成
@@ -62,7 +62,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # ビルド成果物のコピー
-COPY --from=builder /app/public ./public
+COPY --from=builder /app/public ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
@@ -72,9 +72,8 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# standaloneモードでは server.js を起動する
-CMD ["node", "server.js"]
-
+# standaloneモードでは、起動前にDBスキーマを同期してから server.js を起動する
+CMD ["sh", "-c", "npx prisma db push && node server.js"]
 ```
 
 ## 3. .dockerignore の作成
@@ -85,7 +84,7 @@ CMD ["node", "server.js"]
 node_modules
 .next
 .git
-.env*.local
+.env*
 README.md
 Dockerfile
 .dockerignore
@@ -116,6 +115,10 @@ podman run -d \
 
 ## 5. AWS ECS (Fargate) へのデプロイ手順
 
+### データベースのスキーマ同期について
+本プロジェクトでは `Dockerfile` の `CMD` に `npx prisma db push` を含めています。
+これにより、**ECS タスクが起動するたびに自動的にデータベースのテーブル構成が最新の状態に更新されます。** 開発者が手動で本番 DB に対してコマンドを打つ必要はありません。
+
 ### ECR へのプッシュ
 1. ECR リポジトリを作成します。
 2. ログインしてプッシュします。
@@ -124,6 +127,17 @@ aws ecr get-login-password --region <REGION> | podman login --username AWS --pas
 
 podman tag pet-hotel-app:latest <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/pet-hotel-app:latest
 podman push <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/pet-hotel-app:latest
+```
+
+### quay.io へのプッシュ
+1. `quay.io` にログインします。
+```bash
+podman login quay.io
+```
+2. タグを付けてプッシュします。
+```bash
+podman tag pet-hotel-app:latest quay.io/<USERNAME>/pet-hotel-app:latest
+podman push quay.io/<USERNAME>/pet-hotel-app:latest
 ```
 
 ### ECS 設定のポイント
@@ -165,4 +179,3 @@ podman push <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/pet-hotel-app:latest
    - 例: `arn:aws:secretsmanager:...:secret:MySecret:db_pass::`
 
 - **セキュリティグループ**: ECS タスクから PostgreSQL (RDS 等) へのポート 5432 の通信を許可してください。
-- **DB スキーマの更新**: デプロイ時に `npx prisma db push` を実行するステップを CI/CD パイプラインに含めることを推奨します。

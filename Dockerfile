@@ -46,5 +46,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# standaloneモードでは server.js を起動する
-CMD ["node", "server.js"]
+# standaloneモードでは、起動前にDBスキーマを同期してから server.js を起動する
+CMD ["sh", "-c", "npx prisma db push && node server.js"]
