@@ -1,11 +1,11 @@
-version: '3.8'
+# version: '3.8'
 services:
   db:
     image: postgres:15-alpine
     container_name: pet-hotel-db
     restart: always
     environment:
-      POSTGRES_USER: user
+      POSTGRES_USER: pethotel-psql-user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: pet_hotel
     ports:
